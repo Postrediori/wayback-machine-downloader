@@ -7,6 +7,8 @@ require 'fileutils'
 require 'cgi'
 require 'json'
 require 'time'
+require 'zlib'
+require 'stringio'
 require_relative 'wayback_machine_downloader/tidy_bytes'
 require_relative 'wayback_machine_downloader/to_regex'
 require_relative 'wayback_machine_downloader/archive_api'
@@ -271,7 +273,15 @@ class WaybackMachineDownloader
         open(file_path, "wb") do |file|
           begin
             URI("https://web.archive.org/web/#{file_timestamp}id_/#{file_url}").open("Accept-Encoding" => "plain") do |uri|
-              file.write(uri.read)
+              content = uri.read
+              
+              if uri.content_encoding.include? 'gzip'
+                gz = Zlib::GzipReader.new(StringIO.new(content))
+                content = gz.read
+              end
+              
+              file.write(content)
+
               if uri.meta.has_key?("x-archive-orig-last-modified")
                 original_file_mtime = Time.parse(uri.meta["x-archive-orig-last-modified"])
               end
